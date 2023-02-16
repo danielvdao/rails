@@ -1,9 +1,15 @@
-*   Add a load hook for `ActiveRecord::ConnectionAdapters::Mysql2Adapter`
-    (named `active_record_mysql2adapter`) to allow for overriding aspects of the
-    `ActiveRecord::ConnectionAdapters::Mysql2Adapter` class. This makes `Mysql2Adapter`
-    consistent with `PostgreSQLAdapter` and `SQLite3Adapter` that already have load hooks.
+*   Make `.joins` / `.left_outer_joins` work with CTEs.
 
-    *fatkodima*
+    For example:
+
+    ```ruby
+    Post
+     .with(commented_posts: Comment.select(:post_id).distinct)
+     .joins(:commented_posts)
+    #=> WITH (...) SELECT ... INNER JOIN commented_posts on posts.id = commented_posts.post_id
+    ```
+
+    *Vladimir Dementyev*
 
 *   Introduce adapter for Trilogy database client
 
