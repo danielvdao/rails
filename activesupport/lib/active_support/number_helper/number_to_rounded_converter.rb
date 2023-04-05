@@ -42,14 +42,21 @@ module ActiveSupport
       end
 
       private
+        def truncate_whole_number
+          options[:truncate_whole_number]
+        end
+
         def strip_insignificant_zeros
           options[:strip_insignificant_zeros]
         end
 
         def format_number(number)
+          escaped_separator = Regexp.escape(options[:separator])
+
           if strip_insignificant_zeros
-            escaped_separator = Regexp.escape(options[:separator])
             number.sub(/(#{escaped_separator})(\d*[1-9])?0+\z/, '\1\2').sub(/#{escaped_separator}\z/, "")
+          elsif truncate_whole_number && number.match?(/(#{escaped_separator})(0+\z)/)
+            number.split(options[:separator])[0]
           else
             number
           end
