@@ -1,3 +1,13 @@
+*   Add `strip_final_zeros` to `ActiveSupport::NumberHelper.number_to_currency`.
+
+    ```ruby
+    ActiveSupport::NumberHelper.number_to_currency(30.05, strip_final_zeros: true) # => $30.05
+    ActiveSupport::NumberHelper.number_to_currency(30.50, strip_final_zeros: true) # => $30.50
+    ActiveSupport::NumberHelper.number_to_currency(30.00, strip_final_zeros: true) # => $30
+    ```
+
+    *Daniel Vu Dao*
+
 *   Consistently raise an `ArgumentError` if the `ActiveSupport::Cache` key is blank.
 
     *Joshua Young*
