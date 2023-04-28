@@ -42,8 +42,8 @@ module ActiveSupport
       end
 
       private
-        def truncate_whole_number
-          options[:truncate_whole_number]
+        def convert_to_whole_number
+          options[:convert_to_whole_number]
         end
 
         def strip_insignificant_zeros
@@ -55,7 +55,7 @@ module ActiveSupport
 
           if strip_insignificant_zeros
             number.sub(/(#{escaped_separator})(\d*[1-9])?0+\z/, '\1\2').sub(/#{escaped_separator}\z/, "")
-          elsif truncate_whole_number && number.match?(/(#{escaped_separator})(0+\z)/)
+          elsif convert_to_whole_number && number.match?(/(#{escaped_separator})(0+\z)/)
             number.split(options[:separator])[0]
           else
             number
