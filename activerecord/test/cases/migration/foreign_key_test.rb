@@ -93,7 +93,7 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
         end
 
         def test_rename_reference_column_of_child_table
-          if current_adapter?(:Mysql2Adapter) && !@connection.send(:supports_rename_index?)
+          if current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && !@connection.send(:supports_rename_index?)
             skip "Cannot drop index, needed in a foreign key constraint"
           end
 
@@ -271,7 +271,7 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
           assert_equal 1, foreign_keys.size
 
           fk = foreign_keys.first
-          if current_adapter?(:Mysql2Adapter)
+          if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)
             # ON DELETE RESTRICT is the default on MySQL
             assert_nil fk.on_delete
           else
@@ -519,13 +519,13 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
 
         if ActiveRecord::Base.connection.supports_deferrable_constraints?
           def test_deferrable_foreign_key
-            @connection.add_foreign_key :astronauts, :rockets, column: "rocket_id", deferrable: true
+            @connection.add_foreign_key :astronauts, :rockets, column: "rocket_id", deferrable: :immediate
 
             foreign_keys = @connection.foreign_keys("astronauts")
             assert_equal 1, foreign_keys.size
 
             fk = foreign_keys.first
-            assert_equal true, fk.options[:deferrable]
+            assert_equal :immediate, fk.deferrable
           end
 
           def test_not_deferrable_foreign_key
@@ -535,7 +535,7 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
             assert_equal 1, foreign_keys.size
 
             fk = foreign_keys.first
-            assert_equal false, fk.options[:deferrable]
+            assert_equal false, fk.deferrable
           end
 
           def test_deferrable_initially_deferred_foreign_key
@@ -545,7 +545,7 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
             assert_equal 1, foreign_keys.size
 
             fk = foreign_keys.first
-            assert_equal :deferred, fk.options[:deferrable]
+            assert_equal :deferred, fk.deferrable
           end
 
           def test_deferrable_initially_immediate_foreign_key
@@ -555,15 +555,15 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
             assert_equal 1, foreign_keys.size
 
             fk = foreign_keys.first
-            assert_equal true, fk.options[:deferrable]
+            assert_equal :immediate, fk.deferrable
           end
 
           def test_schema_dumping_with_defferable
-            @connection.add_foreign_key :astronauts, :rockets, column: "rocket_id", deferrable: true
+            @connection.add_foreign_key :astronauts, :rockets, column: "rocket_id", deferrable: :immediate
 
             output = dump_table_schema "astronauts"
 
-            assert_match %r{\s+add_foreign_key "astronauts", "rockets", deferrable: true$}, output
+            assert_match %r{\s+add_foreign_key "astronauts", "rockets", deferrable: :immediate$}, output
           end
 
           def test_schema_dumping_with_disabled_defferable
@@ -587,7 +587,19 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
 
             output = dump_table_schema "astronauts"
 
-            assert_match %r{\s+add_foreign_key "astronauts", "rockets", deferrable: true$}, output
+            assert_match %r{\s+add_foreign_key "astronauts", "rockets", deferrable: :immediate$}, output
+          end
+
+          def test_deferrable_true_foreign_key
+            assert_deprecated(ActiveRecord.deprecator) do
+              @connection.add_foreign_key :astronauts, :rockets, column: "rocket_id", deferrable: true
+            end
+
+            foreign_keys = @connection.foreign_keys("astronauts")
+            assert_equal 1, foreign_keys.size
+
+            fk = foreign_keys.first
+            assert_equal :immediate, fk.deferrable
           end
         end
 
@@ -748,7 +760,7 @@ if ActiveRecord::Base.connection.supports_foreign_keys?
               @connection.add_foreign_key :astronauts, :rockets
             end
 
-            if current_adapter?(:Mysql2Adapter)
+            if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)
               if ActiveRecord::Base.connection.mariadb?
                 assert_match(/Duplicate key on write or update/, error.message)
               elsif ActiveRecord::Base.connection.database_version < "5.6"

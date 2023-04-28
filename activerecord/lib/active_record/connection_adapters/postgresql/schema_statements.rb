@@ -518,9 +518,23 @@ module ActiveRecord
           super
         end
 
+        def add_foreign_key(from_table, to_table, **options)
+          if options[:deferrable] == true
+            ActiveRecord.deprecator.warn(<<~MSG)
+              `deferrable: true` is deprecated in favor of `deferrable: :immediate`, and will be removed in Rails 7.2.
+            MSG
+
+            options[:deferrable] = :immediate
+          end
+
+          assert_valid_deferrable(options[:deferrable])
+
+          super
+        end
+
         def foreign_keys(table_name)
           scope = quoted_scope(table_name)
-          fk_info = exec_query(<<~SQL, "SCHEMA", allow_retry: true, uses_transaction: false)
+          fk_info = internal_exec_query(<<~SQL, "SCHEMA", allow_retry: true, materialize_transactions: false)
             SELECT t2.oid::regclass::text AS to_table, a1.attname AS column, a2.attname AS primary_key, c.conname AS name, c.confupdtype AS on_update, c.confdeltype AS on_delete, c.convalidated AS valid, c.condeferrable AS deferrable, c.condeferred AS deferred
             FROM pg_constraint c
             JOIN pg_class t1 ON c.conrelid = t1.oid
@@ -543,7 +557,7 @@ module ActiveRecord
 
             options[:on_delete] = extract_foreign_key_action(row["on_delete"])
             options[:on_update] = extract_foreign_key_action(row["on_update"])
-            options[:deferrable] = extract_foreign_key_deferrable(row["deferrable"], row["deferred"])
+            options[:deferrable] = extract_constraint_deferrable(row["deferrable"], row["deferred"])
 
             options[:validate] = row["valid"]
             to_table = Utils.unquote_identifier(row["to_table"])
@@ -563,7 +577,7 @@ module ActiveRecord
         def check_constraints(table_name) # :nodoc:
           scope = quoted_scope(table_name)
 
-          check_info = exec_query(<<-SQL, "SCHEMA", allow_retry: true, uses_transaction: false)
+          check_info = internal_exec_query(<<-SQL, "SCHEMA", allow_retry: true, materialize_transactions: false)
             SELECT conname, pg_get_constraintdef(c.oid, true) AS constraintdef, c.convalidated AS valid
             FROM pg_constraint c
             JOIN pg_class t ON c.conrelid = t.oid
@@ -589,7 +603,7 @@ module ActiveRecord
         def exclusion_constraints(table_name)
           scope = quoted_scope(table_name)
 
-          exclusion_info = exec_query(<<-SQL, "SCHEMA")
+          exclusion_info = internal_exec_query(<<-SQL, "SCHEMA")
             SELECT conname, pg_get_constraintdef(c.oid) AS constraintdef, c.condeferrable, c.condeferred
             FROM pg_constraint c
             JOIN pg_class t ON c.conrelid = t.oid
@@ -623,7 +637,7 @@ module ActiveRecord
         def unique_keys(table_name)
           scope = quoted_scope(table_name)
 
-          unique_info = exec_query(<<~SQL, "SCHEMA", allow_retry: true, uses_transaction: false)
+          unique_info = internal_exec_query(<<~SQL, "SCHEMA", allow_retry: true, materialize_transactions: false)
             SELECT c.conname, c.conindid, c.condeferrable, c.condeferred
             FROM pg_constraint c
             JOIN pg_class t ON c.conrelid = t.oid
@@ -700,24 +714,24 @@ module ActiveRecord
 
         # Adds a new unique constraint to the table.
         #
-        # PostgreSQL allows users to create a unique constraints on top of the unique index
-        # that cannot be deferred. In this case, even if users creates deferrable unique constraint,
-        # the existing unique index does not allow users to violate uniqueness within the transaction.
-        # If you want to change existing unique index to deferrable, you need execute `remove_index`
-        # before creating deferrable unique constraints.
-        #
         #   add_unique_key :sections, [:position], deferrable: :deferred, name: "unique_position"
         #
         # generates:
         #
         #   ALTER TABLE "sections" ADD CONSTRAINT unique_position UNIQUE (position) DEFERRABLE INITIALLY DEFERRED
         #
+        # If you want to change an existing unique index to deferrable, you can use :using_index to create deferrable unique constraints.
+        #
+        #   add_unique_key :sections, deferrable: :deferred, name: "unique_position", using_index: "index_sections_on_position"
+        #
         # The +options+ hash can include the following keys:
         # [<tt>:name</tt>]
         #   The constraint name. Defaults to <tt>uniq_rails_<identifier></tt>.
         # [<tt>:deferrable</tt>]
         #   Specify whether or not the unique constraint should be deferrable. Valid values are +false+ or +:immediate+ or +:deferred+ to specify the default behavior. Defaults to +false+.
-        def add_unique_key(table_name, column_name, **options)
+        # [<tt>:using_index</tt>]
+        #   To specify an existing unique index name. Defaults to +nil+.
+        def add_unique_key(table_name, column_name = nil, **options)
           options = unique_key_options(table_name, column_name, options)
           at = create_alter_table(table_name)
           at.add_unique_key(column_name, options)
@@ -727,6 +741,10 @@ module ActiveRecord
 
         def unique_key_options(table_name, column_name, options) # :nodoc:
           assert_valid_deferrable(options[:deferrable])
+
+          if column_name && options[:using_index]
+            raise ArgumentError, "Cannot specify both column_name and :using_index options."
+          end
 
           options = options.dup
           options[:name] ||= unique_key_name(table_name, column_name: column_name, **options)
@@ -943,18 +961,14 @@ module ActiveRecord
             end
           end
 
-          def extract_foreign_key_deferrable(deferrable, deferred)
-            deferrable && (deferred ? :deferred : true)
+          def assert_valid_deferrable(deferrable)
+            return if !deferrable || %i(immediate deferred).include?(deferrable)
+
+            raise ArgumentError, "deferrable must be `:immediate` or `:deferred`, got: `#{deferrable.inspect}`"
           end
 
           def extract_constraint_deferrable(deferrable, deferred)
             deferrable && (deferred ? :deferred : :immediate)
-          end
-
-          def assert_valid_deferrable(deferrable) # :nodoc:
-            return if !deferrable || %i(immediate deferred).include?(deferrable)
-
-            raise ArgumentError, "deferrable must be `:immediate` or `:deferred`, got: `#{deferrable.inspect}`"
           end
 
           def reference_name_for_table(table_name)
@@ -1016,8 +1030,8 @@ module ActiveRecord
 
           def unique_key_name(table_name, **options)
             options.fetch(:name) do
-              column_name = options.fetch(:column_name)
-              identifier = "#{table_name}_#{column_name}_unique"
+              column_name_or_index_name = options.fetch(:column_name) || options[:using_index]
+              identifier = "#{table_name}_#{column_name_or_index_name}_unique"
               hashed_identifier = Digest::SHA256.hexdigest(identifier).first(10)
 
               "uniq_rails_#{hashed_identifier}"

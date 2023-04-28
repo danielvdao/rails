@@ -159,12 +159,6 @@ module CacheStoreBehavior
     end
   end
 
-  def test_read_multi_with_empty_keys_and_a_logger_and_no_namespace
-    cache = lookup_store(namespace: nil)
-    cache.logger = ActiveSupport::Logger.new(nil)
-    assert_equal({}, cache.read_multi)
-  end
-
   def test_fetch_multi
     key = SecureRandom.uuid
     other_key = SecureRandom.uuid
@@ -464,6 +458,22 @@ module CacheStoreBehavior
     assert_nil @cache.read(key.upcase)
   end
 
+  def test_blank_key
+    invalid_keys = [nil, "", [], {}]
+    invalid_keys.each do |key|
+      assert_raises(ArgumentError) { @cache.write(key, "bar") }
+      assert_raises(ArgumentError) { @cache.read(key) }
+      assert_raises(ArgumentError) { @cache.delete(key) }
+    end
+
+    valid_keys = ["foo", ["bar"], { foo: "bar" }, 0, 1, InstanceTest.new("foo", 2)]
+    valid_keys.each do |key|
+      assert_nothing_raised { @cache.write(key, "bar") }
+      assert_nothing_raised { @cache.read(key) }
+      assert_nothing_raised { @cache.delete(key) }
+    end
+  end
+
   def test_exist
     key = SecureRandom.alphanumeric
     @cache.write(key, "bar")
@@ -602,6 +612,7 @@ module CacheStoreBehavior
         @cache.write(key, "bar", expires_in: -60)
       end
       assert_equal "Cache expiration time is invalid, cannot be negative: -60", error.message
+      assert_nil @cache.read(key)
     end
   end
 
@@ -612,11 +623,23 @@ module CacheStoreBehavior
         logs = capture_logs do
           key = SecureRandom.uuid
           @cache.write(key, "bar", expires_in: -60)
+          assert_equal "bar", @cache.read(key)
         end
         assert_includes logs, "ArgumentError: #{error_message}"
       end
       assert_includes report.error.message, error_message
     end
+  end
+
+  def test_expires_in_from_now_raises_an_error
+    time = 1.minute.from_now
+
+    key = SecureRandom.uuid
+    error = assert_raises(ArgumentError) do
+      @cache.write(key, "bar", expires_in: time)
+    end
+    assert_equal "expires_in parameter should not be a Time. Did you mean to use expires_at? Got: #{time}", error.message
+    assert_nil @cache.read(key)
   end
 
   def test_race_condition_protection_skipped_if_not_defined

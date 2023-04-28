@@ -15,6 +15,8 @@ module ActiveRecord
   class FixtureClassNotFound < ActiveRecord::ActiveRecordError # :nodoc:
   end
 
+  # = Active Record \Fixtures
+  #
   # \Fixtures are a way of organizing data that you want to test against; in short, sample data.
   #
   # They are stored in YAML files, one file per model, which are placed in the directories
@@ -400,6 +402,10 @@ module ActiveRecord
   #     monkey_id: <%= ActiveRecord::FixtureSet.identify(:reginald) %>
   #     pirate_id: <%= ActiveRecord::FixtureSet.identify(:george) %>
   #
+  # If the model uses UUID values for identifiers, add the `:uuid` argument:
+  #
+  #   ActiveRecord::FixtureSet.identify(:boaty_mcboatface, :uuid)
+  #
   # == Support for YAML defaults
   #
   # You can set and reuse defaults in your fixtures YAML file.
@@ -585,6 +591,18 @@ module ActiveRecord
         end
       end
 
+      # Returns a consistent, platform-independent hash representing a mapping
+      # between the label and the subcomponents of the provided composite key.
+      #
+      # Example:
+      # composite_identify("label", [:a, :b, :c]) => { a: hash_1, b: hash_2, c: hash_3 }
+      def composite_identify(label, key)
+        key
+          .index_with
+          .with_index { |sub_key, index| (identify(label) << index) % MAX_ID }
+          .with_indifferent_access
+      end
+
       # Superclass for the evaluation contexts used by ERB fixtures.
       def context_class
         @context_class ||= Class.new
@@ -630,14 +648,22 @@ module ActiveRecord
 
             conn.insert_fixtures_set(table_rows_for_connection, table_rows_for_connection.keys)
 
-            if ActiveRecord.verify_foreign_keys_for_fixtures && !conn.all_foreign_keys_valid?
-              raise "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations."
-            end
+            check_all_foreign_keys_valid!(conn)
 
             # Cap primary key sequences to max(pk).
             if conn.respond_to?(:reset_pk_sequence!)
               set.each { |fs| conn.reset_pk_sequence!(fs.table_name) }
             end
+          end
+        end
+
+        def check_all_foreign_keys_valid!(conn)
+          return unless ActiveRecord.verify_foreign_keys_for_fixtures
+
+          begin
+            conn.check_all_foreign_keys_valid!
+          rescue ActiveRecord::StatementInvalid => e
+            raise "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations. Error from database:\n\n#{e.message}"
           end
         end
 

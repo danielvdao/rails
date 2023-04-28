@@ -475,7 +475,7 @@ class RelationTest < ActiveRecord::TestCase
 
   def test_finding_with_sanitized_order
     query = Tag.order([Arel.sql("field(id, ?)"), [1, 3, 2]]).to_sql
-    if current_adapter?(:Mysql2Adapter)
+    if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)
       assert_match(/field\(id, '1','3','2'\)/, query)
     else
       assert_match(/field\(id, 1,3,2\)/, query)
@@ -490,7 +490,7 @@ class RelationTest < ActiveRecord::TestCase
 
   def test_finding_with_arel_sql_order
     query = Tag.order(Arel.sql("field(id, ?)", [1, 3, 2])).to_sql
-    if current_adapter?(:Mysql2Adapter)
+    if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)
       assert_match(/field\(id, '1', '3', '2'\)/, query)
     else
       assert_match(/field\(id, 1, 3, 2\)/, query)
@@ -2451,4 +2451,54 @@ class RelationTest < ActiveRecord::TestCase
         predicate_builder: predicate_builder
       )
     end
+end
+
+class CreateOrFindByWithinTransactions < ActiveRecord::TestCase
+  unless current_adapter?(:SQLite3Adapter)
+    self.use_transactional_tests = false
+
+    def teardown
+      Subscriber.delete_all
+    end
+
+    def test_multiple_find_or_create_by_within_transactions
+      duel { Subscriber.find_or_create_by(nick: "bob") }
+    end
+
+    def test_multiple_find_or_create_by_bang_within_transactions
+      duel { Subscriber.find_or_create_by!(nick: "bob") }
+    end
+
+    private
+      def duel
+        assert_nil Subscriber.find_by(nick: "bob")
+
+        a_wakeup = Concurrent::Event.new
+        b_wakeup = Concurrent::Event.new
+
+        a = Thread.new do
+          Subscriber.transaction do
+            a_wakeup.wait
+            yield
+            b_wakeup.set
+          end
+        end
+
+        b = Thread.new do
+          Subscriber.transaction do
+            # Read the record prematurely for MySQL REPEATABLE READ to kick in
+            Subscriber.find_by(nick: "bob")
+
+            a_wakeup.set
+            b_wakeup.wait
+            yield
+          end
+        end
+
+        a.join
+        b.join
+
+        assert_equal 1, Subscriber.where(nick: "bob").count
+      end
+  end
 end

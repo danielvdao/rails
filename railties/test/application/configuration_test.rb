@@ -4008,7 +4008,7 @@ module ApplicationTests
     test "Rails.application.deprecators includes framework deprecators" do
       app "production"
 
-      assert_includes Rails.application.deprecators.each, ActiveSupport::Deprecation.instance
+      assert_includes Rails.application.deprecators.each, ActiveSupport::Deprecation._instance
       assert_equal ActionCable.deprecator, Rails.application.deprecators[:action_cable]
       assert_equal AbstractController.deprecator, Rails.application.deprecators[:action_controller]
       assert_equal ActionController.deprecator, Rails.application.deprecators[:action_controller]
@@ -4022,7 +4022,7 @@ module ApplicationTests
       assert_equal ActiveRecord.deprecator, Rails.application.deprecators[:active_record]
       assert_equal ActiveStorage.deprecator, Rails.application.deprecators[:active_storage]
       assert_equal ActiveSupport.deprecator, Rails.application.deprecators[:active_support]
-      assert_equal Rails.deprecator, Rails.application.deprecators[:rails]
+      assert_equal Rails.deprecator, Rails.application.deprecators[:railties]
     end
 
     test "can entirely opt out of deprecation warnings" do
@@ -4344,6 +4344,42 @@ module ApplicationTests
       assert_raises I18n::InvalidPluralizationData do
         assert_equal "pears", I18n.t(:pears, count: 0)
       end
+    end
+
+    test "run_after_transaction_callbacks_in_order_defined is true in new apps" do
+      app "development"
+
+      assert_equal true, ActiveRecord.run_after_transaction_callbacks_in_order_defined
+    end
+
+    test "run_after_transaction_callbacks_in_order_defined is false in upgrading apps" do
+      remove_from_config '.*config\.load_defaults.*\n'
+      add_to_config 'config.load_defaults "7.0"'
+      app "development"
+
+      assert_equal false, ActiveRecord.run_after_transaction_callbacks_in_order_defined
+    end
+
+    test "run_after_transaction_callbacks_in_order_defined can be set via framework defaults" do
+      remove_from_config '.*config\.load_defaults.*\n'
+      add_to_config 'config.load_defaults "7.0"'
+      app_file "config/initializers/new_framework_defaults_7_1.rb", <<-RUBY
+        Rails.application.config.active_record.run_after_transaction_callbacks_in_order_defined = true
+      RUBY
+      app "development"
+
+      assert_equal true, ActiveRecord.run_after_transaction_callbacks_in_order_defined
+    end
+
+    test "raises if configuration tries to assign to an actual method" do
+      remove_from_config '.*config\.load_defaults.*\n'
+      add_to_config 'config.load_defaults = "7.0"'
+
+      error = assert_raises(NoMethodError) do
+        app "development"
+      end
+
+      assert_match(/Cannot assign to `load_defaults`, it is a configuration method/, error.message)
     end
 
     private

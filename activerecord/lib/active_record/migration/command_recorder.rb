@@ -2,6 +2,8 @@
 
 module ActiveRecord
   class Migration
+    # = \Migration Command Recorder
+    #
     # <tt>ActiveRecord::Migration::CommandRecorder</tt> records commands done during
     # a migration and knows how to reverse those commands. The CommandRecorder
     # knows how to invert the following commands:
@@ -315,6 +317,13 @@ module ActiveRecord
 
         def invert_remove_exclusion_constraint(args)
           raise ActiveRecord::IrreversibleMigration, "remove_exclusion_constraint is only reversible if given an expression." if args.size < 2
+          super
+        end
+
+        def invert_add_unique_key(args)
+          options = args.dup.extract_options!
+
+          raise ActiveRecord::IrreversibleMigration, "add_unique_key is not reversible if given an using_index." if options[:using_index]
           super
         end
 

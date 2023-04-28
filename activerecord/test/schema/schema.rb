@@ -205,7 +205,7 @@ ActiveRecord::Schema.define do
   create_table :carriers, force: true
 
   create_table :carts, force: true, primary_key: [:shop_id, :id] do |t|
-    if ActiveRecord::TestCase.current_adapter?(:Mysql2Adapter)
+    if ActiveRecord::TestCase.current_adapter?(:Mysql2Adapter, :TrilogyAdapter)
       t.bigint :id, index: true, auto_increment: true, null: false
     else
       t.bigint :id, index: true, null: false
@@ -244,12 +244,31 @@ ActiveRecord::Schema.define do
     t.integer :number
     t.string :title
     t.integer :revision
+    t.integer :order_id
+  end
+
+  create_table :cpk_authors, force: true do |t|
+    t.string :name
+  end
+
+  create_table :cpk_reviews, force: true do |t|
+    t.integer :author_id
+    t.integer :number
+    t.integer :rating
+    t.string :comment
   end
 
   create_table :cpk_orders, primary_key: [:shop_id, :id], force: true do |t|
     t.integer :shop_id
     t.integer :id
     t.string :status
+  end
+
+  create_table :cpk_order_agreements, force: true do |t|
+    t.integer :order_id
+    t.string :signature
+
+    t.index :order_id
   end
 
   create_table :paragraphs, force: true do |t|

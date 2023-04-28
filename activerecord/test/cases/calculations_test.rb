@@ -24,7 +24,7 @@ require "models/rating"
 require "models/too_long_table_name"
 require "support/stubs/strong_parameters"
 require "support/async_helper"
-require "models/cpk/book"
+require "models/cpk"
 
 class CalculationsTest < ActiveRecord::TestCase
   include AsyncHelper
@@ -392,6 +392,17 @@ class CalculationsTest < ActiveRecord::TestCase
     assert_equal({ 6 => 2 }, Account.group(:firm_id).distinct.order("1 DESC").limit(1).count)
   end
 
+  def test_count_for_a_composite_primary_key_model
+    book = cpk_books(:cpk_great_author_first_book)
+    assert_equal(1, Cpk::Book.where(author_id: book.author_id, number: book.number).count)
+  end
+
+  def test_group_by_count_for_a_composite_primary_key_model
+    book = cpk_books(:cpk_great_author_first_book)
+    expected = { book.author_id => Cpk::Book.where(author_id: book.author_id).count }
+    assert_equal(expected, Cpk::Book.where(author_id: book.author_id).group(:author_id).count)
+  end
+
   def test_should_group_by_summed_field_having_condition
     c = Account.group(:firm_id).having("sum(credit_limit) > 50").sum(:credit_limit)
     assert_nil        c[1]
@@ -400,7 +411,7 @@ class CalculationsTest < ActiveRecord::TestCase
   end
 
   def test_should_group_by_summed_field_having_condition_from_select
-    skip unless current_adapter?(:Mysql2Adapter, :SQLite3Adapter)
+    skip unless current_adapter?(:Mysql2Adapter, :TrilogyAdapter, :SQLite3Adapter)
     c = Account.select("MIN(credit_limit) AS min_credit_limit").group(:firm_id).having("min_credit_limit > 50").sum(:credit_limit)
     assert_nil       c[1]
     assert_equal 60, c[2]
@@ -941,8 +952,12 @@ class CalculationsTest < ActiveRecord::TestCase
     assert_equal Company.all.map(&:id).sort, Company.all.ids.sort
   end
 
-  def ids_for_a_composite_primary_key
+  def test_ids_for_a_composite_primary_key
     assert_equal Cpk::Book.all.map(&:id).sort, Cpk::Book.all.ids.sort
+  end
+
+  def test_pluck_for_a_composite_primary_key
+    assert_equal Cpk::Book.all.pluck([:author_id, :number]).sort, Cpk::Book.all.ids.sort
   end
 
   def test_ids_for_a_composite_primary_key_with_scope

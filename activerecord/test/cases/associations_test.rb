@@ -35,6 +35,7 @@ require "models/essay"
 require "models/member"
 require "models/membership"
 require "models/sharded"
+require "models/cpk"
 require "models/member_detail"
 require "models/organization"
 
@@ -42,7 +43,8 @@ require "models/organization"
 class AssociationsTest < ActiveRecord::TestCase
   fixtures :accounts, :companies, :developers, :projects, :developers_projects,
            :computers, :people, :readers, :authors, :author_addresses, :author_favorites,
-           :comments, :posts, :sharded_blogs, :sharded_blog_posts, :sharded_comments, :sharded_tags, :sharded_blog_posts_tags
+           :comments, :posts, :sharded_blogs, :sharded_blog_posts, :sharded_comments, :sharded_tags, :sharded_blog_posts_tags,
+           :cpk_orders
 
   def test_eager_loading_should_not_change_count_of_children
     liquid = Liquid.create(name: "salty")
@@ -136,6 +138,14 @@ class AssociationsTest < ActiveRecord::TestCase
     assert_equal(blog_post, comment.blog_post)
   end
 
+  def test_belongs_to_a_cpk_model_by_id_attribute
+    order = cpk_orders(:cpk_groceries_order_1)
+    _order_shop_id, order_id = order.id
+    agreement = Cpk::OrderAgreement.create(order_id: order_id, signature: "signed")
+
+    assert_equal(order, agreement.order)
+  end
+
   def test_belongs_to_a_model_with_composite_primary_key_uses_composite_pk_in_sql
     comment = sharded_comments(:great_comment_blog_post_one)
 
@@ -156,12 +166,37 @@ class AssociationsTest < ActiveRecord::TestCase
     assert_equal(expected_posts.map(&:id).sort, blog_posts.map(&:id).sort)
   end
 
+  def test_querying_by_single_associated_record_works_using_query_constraints
+    comments = [sharded_comments(:great_comment_blog_post_one), sharded_comments(:great_comment_blog_post_two)]
+
+    blog_posts = Sharded::BlogPost.where(comments: comments.last).to_a
+
+    expected_posts = [sharded_blog_posts(:great_post_blog_two)]
+    assert_equal(expected_posts.map(&:id).sort, blog_posts.map(&:id).sort)
+  end
+
+  def test_querying_by_relation_with_composite_key
+    expected_posts = [sharded_blog_posts(:great_post_blog_one), sharded_blog_posts(:great_post_blog_two)]
+
+    blog_posts = Sharded::BlogPost.where(comments: Sharded::Comment.where(body: "I really enjoyed the post!")).to_a
+
+    assert_equal(expected_posts.map(&:id).sort, blog_posts.map(&:id).sort)
+  end
+
   def test_has_many_association_with_composite_foreign_key_loads_records
     blog_post = sharded_blog_posts(:great_post_blog_one)
 
     comments = blog_post.comments.to_a
     assert_includes(comments, sharded_comments(:wow_comment_blog_post_one))
     assert_includes(comments, sharded_comments(:great_comment_blog_post_one))
+  end
+
+  def test_cpk_model_has_many_records_by_id_attribute
+    order = cpk_orders(:cpk_groceries_order_1)
+    _order_shop_id, order_id = order.id
+    agreements = 2.times.map { Cpk::OrderAgreement.create(order_id: order_id, signature: "signed") }
+
+    assert_equal(agreements.sort, order.order_agreements.to_a.sort)
   end
 
   def test_has_many_association_from_a_model_with_query_constraints_different_from_the_association
@@ -267,6 +302,22 @@ class AssociationsTest < ActiveRecord::TestCase
     assert_equal(blog_post, comment.blog_post)
     assert_equal(comment.blog_id, blog_post.blog_id)
     assert_equal(another_blog.id, comment.blog_id)
+  end
+
+
+  def test_assign_belongs_to_cpk_model_by_id_attribute
+    order = cpk_orders(:cpk_groceries_order_1)
+    agreement = Cpk::OrderAgreement.new(signature: "signed")
+
+    agreement.order = order
+    agreement.save
+
+    assert_not_nil(agreement.reload.order)
+    assert_not_nil(agreement.order_id)
+
+    assert_equal(order, agreement.order)
+    _shop_id, order_id = order.id
+    assert_equal(order_id, agreement.order_id)
   end
 
   def test_append_composite_foreign_key_has_many_association_with_autosave
