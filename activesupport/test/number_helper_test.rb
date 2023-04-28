@@ -58,11 +58,13 @@ module ActiveSupport
       end
 
       def test_number_to_currency_truncate_trailing_zeros_and_strip_insignificant_zeros
-        assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050, truncate_trailing_zeros: true, strip_insignificant_zeros: true))
-        assert_equal("$1,234,567,892", number_helper.number_to_currency(1234567892.00, truncate_trailing_zeros: true, strip_insignificant_zeros: true))
-        assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050000, truncate_trailing_zeros: true, strip_insignificant_zeros: true))
-        assert_equal("&pound;1234567890,5", number_helper.number_to_currency(1234567890.50, unit: "&pound;", separator: ",", delimiter: "", truncate_trailing_zeros: true, strip_insignificant_zeros: true))
-        assert_equal("&pound;1234567890", number_helper.number_to_currency(1234567890.00, unit: "&pound;", separator: ",", delimiter: "", truncate_trailing_zeros: true, strip_insignificant_zeros: true))
+        [@instance_with_helpers, TestClassWithClassNumberHelpers, ActiveSupport::NumberHelper].each do |number_helper|
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050, truncate_trailing_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("$1,234,567,892", number_helper.number_to_currency(1234567892.00, truncate_trailing_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050000, truncate_trailing_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("&pound;1234567890,5", number_helper.number_to_currency(1234567890.50, unit: "&pound;", separator: ",", delimiter: "", truncate_trailing_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("&pound;1234567890", number_helper.number_to_currency(1234567890.00, unit: "&pound;", separator: ",", delimiter: "", truncate_trailing_zeros: true, strip_insignificant_zeros: true))
+        end
       end
 
       def test_number_to_phone

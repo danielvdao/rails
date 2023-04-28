@@ -42,8 +42,8 @@ module ActiveSupport
       end
 
       private
-        def convert_to_whole_number
-          options[:convert_to_whole_number]
+        def strip_insignificant_zeros
+          options[:strip_insignificant_zeros]
         end
 
         def truncate_trailing_zeros
