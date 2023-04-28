@@ -7,6 +7,8 @@ require "active_record/database_configurations/url_config"
 require "active_record/database_configurations/connection_url_resolver"
 
 module ActiveRecord
+  # = Active Record Database Configurations
+  #
   # ActiveRecord::DatabaseConfigurations returns an array of DatabaseConfig
   # objects that are constructed from the application's database
   # configuration hash or URL string.
@@ -119,12 +121,12 @@ module ActiveRecord
     # If the application has multiple databases +find_db_config+ will return
     # the first DatabaseConfig for the environment.
     def find_db_config(env)
-      configurations
-        .sort_by.with_index { |db_config, i| db_config.for_current_env? ? [0, i] : [1, i] }
-        .find do |db_config|
-          db_config.env_name == env.to_s ||
-            (db_config.for_current_env? && db_config.name == env.to_s)
-        end
+      env = env.to_s
+      configurations.find do |db_config|
+        db_config.for_current_env? && (db_config.env_name == env || db_config.name == env)
+      end || configurations.find do |db_config|
+        db_config.env_name == env
+      end
     end
 
     # A primary configuration is one that is named primary or if there is

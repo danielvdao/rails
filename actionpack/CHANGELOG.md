@@ -1,3 +1,23 @@
+*   Remove leading dot from domains on cookies set with `domain: :all`, to meet RFC6265 requirements
+
+    *Gareth Adams*
+
+*   Include source location in routes extended view.
+
+    ```bash
+    $ bin/rails routes --expanded
+
+    ...
+    --[ Route 14 ]----------
+    Prefix            | new_gist
+    Verb              | GET
+    URI               | /gist(.:format)
+    Controller#Action | gists/gists#new
+    Source Location   | config/routes/gist.rb:3
+    ```
+
+    *Luan Vieira, John Hawthorn and Daniel Colson*
+
 *   Add `without` as an alias of `except` on `ActiveController::Parameters`.
 
     *Hidde-Jan Jongsma*

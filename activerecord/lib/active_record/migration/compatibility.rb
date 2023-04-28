@@ -121,8 +121,8 @@ module ActiveRecord
 
         def change_column(table_name, column_name, type, **options)
           options[:_skip_validate_options] = true
-          if connection.adapter_name == "Mysql2"
-            options[:collation] = :no_collation
+          if connection.adapter_name == "Mysql2" || connection.adapter_name == "Trilogy"
+            options[:collation] ||= :no_collation
           end
           super
         end
@@ -134,6 +134,13 @@ module ActiveRecord
         def disable_extension(name, **options)
           if connection.adapter_name == "PostgreSQL"
             options[:force] = :cascade
+          end
+          super
+        end
+
+        def add_foreign_key(from_table, to_table, **options)
+          if connection.adapter_name == "PostgreSQL" && options[:deferrable] == true
+            options[:deferrable] = :immediate
           end
           super
         end
@@ -294,6 +301,9 @@ module ActiveRecord
           private
             def raise_on_if_exist_options(options)
             end
+
+            def raise_on_duplicate_column(name)
+            end
         end
 
         module CommandRecorder
@@ -369,7 +379,7 @@ module ActiveRecord
         end
 
         def create_table(table_name, **options)
-          if connection.adapter_name == "Mysql2"
+          if connection.adapter_name == "Mysql2" || connection.adapter_name == "Trilogy"
             super(table_name, options: "ENGINE=InnoDB", **options)
           else
             super
@@ -401,7 +411,7 @@ module ActiveRecord
             end
           end
 
-          unless connection.adapter_name == "Mysql2" && options[:id] == :bigint
+          unless ["Mysql2", "Trilogy"].include?(connection.adapter_name) && options[:id] == :bigint
             if [:integer, :bigint].include?(options[:id]) && !options.key?(:default)
               options[:default] = nil
             end

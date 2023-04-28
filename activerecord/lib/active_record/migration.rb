@@ -969,9 +969,7 @@ module ActiveRecord
     end
 
     def method_missing(method, *arguments, &block)
-      arg_list = arguments.map(&:inspect) * ", "
-
-      say_with_time "#{method}(#{arg_list})" do
+      say_with_time "#{method}(#{format_arguments(arguments)})" do
         unless connection.respond_to? :revert
           unless arguments.empty? || [:execute, :enable_extension, :disable_extension].include?(method)
             arguments[0] = proper_table_name(arguments.first, table_name_options)
@@ -1080,6 +1078,22 @@ module ActiveRecord
         end
       end
 
+      def format_arguments(arguments)
+        arg_list = arguments[0...-1].map(&:inspect)
+        last_arg = arguments.last
+        if last_arg.is_a?(Hash)
+          last_arg = last_arg.reject { |k, _v| internal_option?(k) }
+          arg_list << last_arg.inspect unless last_arg.empty?
+        else
+          arg_list << last_arg.inspect
+        end
+        arg_list.join(", ")
+      end
+
+      def internal_option?(option_name)
+        option_name.start_with?("_")
+      end
+
       def command_recorder
         CommandRecorder.new(connection)
       end
@@ -1112,6 +1126,8 @@ module ActiveRecord
       end
   end
 
+  # = \Migration \Context
+  #
   # MigrationContext sets the context in which a migration is run.
   #
   # A migration context requires the path to the migrations is set
@@ -1127,7 +1143,7 @@ module ActiveRecord
         ActiveRecord.deprecator.warn(<<-MSG.squish)
           SchemaMigration no longer inherits from ActiveRecord::Base. If you want
           to use the default connection, remove this argument. If you want to use a
-          specific connection, instaniate MigrationContext with the connection's schema
+          specific connection, instantiate MigrationContext with the connection's schema
           migration, for example `MigrationContext.new(path, Dog.connection.schema_migration)`.
         MSG
 
@@ -1138,7 +1154,7 @@ module ActiveRecord
         ActiveRecord.deprecator.warn(<<-MSG.squish)
           SchemaMigration no longer inherits from ActiveRecord::Base. If you want
           to use the default connection, remove this argument. If you want to use a
-          specific connection, instaniate MigrationContext with the connection's internal
+          specific connection, instantiate MigrationContext with the connection's internal
           metadata, for example `MigrationContext.new(path, nil, Dog.connection.internal_metadata)`.
         MSG
 

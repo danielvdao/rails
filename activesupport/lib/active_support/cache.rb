@@ -130,6 +130,8 @@ module ActiveSupport
         end
     end
 
+    # = Active Support \Cache \Store
+    #
     # An abstract cache store class. There are multiple cache store
     # implementations, each having its own additional features. See the classes
     # under the ActiveSupport::Cache module, e.g.
@@ -740,15 +742,13 @@ module ActiveSupport
             expires_at = call_options.delete(:expires_at)
             call_options[:expires_in] = (expires_at - Time.now) if expires_at
 
+            if call_options[:expires_in].is_a?(Time)
+              expires_in = call_options[:expires_in]
+              raise ArgumentError.new("expires_in parameter should not be a Time. Did you mean to use expires_at? Got: #{expires_in}")
+            end
             if call_options[:expires_in]&.negative?
               expires_in = call_options.delete(:expires_in)
-              error = ArgumentError.new("Cache expiration time is invalid, cannot be negative: #{expires_in}")
-              if ActiveSupport::Cache::Store.raise_on_invalid_cache_expiration_time
-                raise error
-              else
-                ActiveSupport.error_reporter&.report(error, handled: true, severity: :warning)
-                logger.error("#{error.class}: #{error.message}") if logger
-              end
+              handle_invalid_expires_in("Cache expiration time is invalid, cannot be negative: #{expires_in}")
             end
 
             if options.empty?
@@ -758,6 +758,16 @@ module ActiveSupport
             end
           else
             options
+          end
+        end
+
+        def handle_invalid_expires_in(message)
+          error = ArgumentError.new(message)
+          if ActiveSupport::Cache::Store.raise_on_invalid_cache_expiration_time
+            raise error
+          else
+            ActiveSupport.error_reporter&.report(error, handled: true, severity: :warning)
+            logger.error("#{error.class}: #{error.message}") if logger
           end
         end
 
@@ -773,10 +783,14 @@ module ActiveSupport
           options
         end
 
-        # Expands and namespaces the cache key. May be overridden by
-        # cache stores to do additional normalization.
+        # Expands and namespaces the cache key.
+        # Raises an exception when the key is +nil+ or an empty string.
+        # May be overridden by cache stores to do additional normalization.
         def normalize_key(key, options = nil)
-          namespace_key expanded_key(key), options
+          str_key = expanded_key(key)
+          raise(ArgumentError, "key cannot be blank") if !str_key || str_key.empty?
+
+          namespace_key str_key, options
         end
 
         # Prefix the key with a namespace string:

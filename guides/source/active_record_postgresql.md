@@ -9,7 +9,10 @@ After reading this guide, you will know:
 
 * How to use PostgreSQL's datatypes.
 * How to use UUID primary keys.
+* How to include non-key columns in indexes.
 * How to use deferrable foreign keys.
+* How to use unique constraints.
+* How to implement exclusion constraints.
 * How to implement full text search with PostgreSQL.
 * How to back your Active Record models with database views.
 
@@ -543,6 +546,34 @@ When building a model with a foreign key that will reference this UUID, treat
 $ rails generate model Case device_id:uuid
 ```
 
+Indexing
+--------
+
+* [index creation](https://www.postgresql.org/docs/current/sql-createindex.html)
+
+PostgreSQL includes a variety of index options. The following options are
+supported by the PostgreSQL adapter in addition to the
+[common index options](https://api.rubyonrails.org/classes/ActiveRecord/ConnectionAdapters/SchemaStatements.html#method-i-add_index)
+
+### Include
+
+When creating a new index, non-key columns can be included with the `:include` option.
+These keys are not used in index scans for searching, but can be read during an index
+only scan without having to visit the associated table.
+
+```ruby
+# db/migrate/20131220144913_add_index_users_on_email_include_id.rb
+
+add_index :users, :email, include: :id
+```
+
+Multiple columns are supported:
+
+```ruby
+# db/migrate/20131220144913_add_index_users_on_email_include_id_and_created_at.rb
+
+add_index :users, :email, include: [:id, :created_at]
+```
 
 Generated Columns
 -----------------
@@ -588,7 +619,7 @@ ActiveRecord::Base.connection.transaction do
 end
 ```
 
-The `:deferrable` option can also be set to `true` or `:immediate`, which has the same effect. Both options let the foreign keys keep the default behavior of checking the constraint immediately, but allow manually deferring the checks using `SET CONSTRAINTS ALL DEFERRED` within a transaction. This will cause the foreign keys to be checked when the transaction is committed:
+When the `:deferrable` option is set to `:immediate`, let the foreign keys keep the default behavior of checking the constraint immediately, but allow manually deferring the checks using `SET CONSTRAINTS ALL DEFERRED` within a transaction. This will cause the foreign keys to be checked when the transaction is committed:
 
 ```ruby
 ActiveRecord::Base.transaction do
@@ -599,6 +630,44 @@ end
 ```
 
 By default `:deferrable` is `false` and the constraint is always checked immediately.
+
+Unique Constraint
+-----------------
+
+* [unique constraints](https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-UNIQUE-CONSTRAINTS)
+
+```ruby
+# db/migrate/20230422225213_create_items.rb
+create_table :items do |t|
+  t.integer :position, null: false
+  t.unique_key [:position], deferrable: :immediate
+end
+```
+
+If you want to change an existing unique index to deferrable, you can use `:using_index` to create deferrable unique constraints.
+
+```ruby
+add_unique_key :items, deferrable: :deferred, using_index: "index_items_on_position"
+```
+
+Like foreign keys, unique constraints can be deferred by setting `:deferrable` to either `:immediate` or `:deferred`. By default, `:deferrable` is `false` and the constraint is always checked immediately.
+
+Exclusion Constraints
+---------------------
+
+* [exclusion constraints](https://www.postgresql.org/docs/current/ddl-constraints.html#DDL-CONSTRAINTS-EXCLUSION)
+
+```ruby
+# db/migrate/20131220144913_create_products.rb
+create_table :products do |t|
+  t.integer :price, null: false
+  t.daterange :availability_range, null: false
+
+  t.exclusion_constraint "price WITH =, availability_range WITH &&", using: :gist, name: "price_check"
+end
+```
+
+Like foreign keys, exclusion constraints can be deferred by setting `:deferrable` to either `:immediate` or `:deferred`. By default, `:deferrable` is `false` and the constraint is always checked immediately.
 
 Full Text Search
 ----------------

@@ -1,3 +1,92 @@
+*   Add support for `Array#intersect?` to `ActiveRecord::Relation`.
+
+    `Array#intersect?` is only available on Ruby 3.1 or later.
+
+    This allows the Rubocop `Style/ArrayIntersect` cop to work with `ActiveRecord::Relation` objects.
+
+    *John Harry Kelly*
+
+*   The deferrable foreign key can be passed to `t.references`.
+
+    *Hiroyuki Ishii*
+
+*   Deprecate `deferrable: true` option of `add_foreign_key`.
+
+    `deferrable: true` is deprecated in favor of `deferrable: :immediate`, and
+    will be removed in Rails 7.2.
+
+    Because `deferrable: true` and `deferrable: :deferred` are hard to understand.
+    Both true and :deferred are truthy values.
+    This behavior is the same as the deferrable option of the add_unique_key method, added in #46192.
+
+    *Hiroyuki Ishii*
+
+*   `AbstractAdapter#execute` and `#exec_query` now clear the query cache
+
+    If you need to perform a read only SQL query without clearing the query
+    cache, use `AbstractAdapter#select_all`.
+
+    *Jean Boussier*
+
+*   Make `.joins` / `.left_outer_joins` work with CTEs.
+
+    For example:
+
+    ```ruby
+    Post
+     .with(commented_posts: Comment.select(:post_id).distinct)
+     .joins(:commented_posts)
+    #=> WITH (...) SELECT ... INNER JOIN commented_posts on posts.id = commented_posts.post_id
+    ```
+
+    *Vladimir Dementyev*
+
+*   Add a load hook for `ActiveRecord::ConnectionAdapters::Mysql2Adapter`
+    (named `active_record_mysql2adapter`) to allow for overriding aspects of the
+    `ActiveRecord::ConnectionAdapters::Mysql2Adapter` class. This makes `Mysql2Adapter`
+    consistent with `PostgreSQLAdapter` and `SQLite3Adapter` that already have load hooks.
+
+    *fatkodima*
+
+*   Introduce adapter for Trilogy database client
+
+    Trilogy is a MySQL-compatible database client. Rails applications can use Trilogy
+    by configuring their `config/database.yml`:
+
+    ```yaml
+    development:
+    adapter: trilogy
+    database: blog_development
+    pool: 5
+    ```
+
+    Or by using the `DATABASE_URL` environment variable:
+
+    ```ruby
+    ENV['DATABASE_URL'] # => "trilogy://localhost/blog_development?pool=5"
+    ```
+
+    *Adrianna Chang*
+
+*   `after_commit` callbacks defined on models now execute in the correct order.
+
+    ```ruby
+    class User < ActiveRecord::Base
+      after_commit { puts("this gets called first") }
+      after_commit { puts("this gets called second") }
+    end
+    ```
+
+    Previously, the callbacks executed in the reverse order. To opt in to the new behaviour:
+
+    ```ruby
+    config.active_record.run_after_transaction_callbacks_in_order_defined = true
+    ```
+
+    This is the default for new apps.
+
+    *Alex Ghiculescu*
+
 *   Infer `foreign_key` when `inverse_of` is present on `has_one` and `has_many` associations.
 
     ```ruby
@@ -189,11 +278,12 @@
     add_unique_key :items, [:position], deferrable: :deferred
     ```
 
-    PostgreSQL allows users to create a unique constraints on top of the unique
-    index that cannot be deferred. In this case, even if users creates deferrable
-    unique constraint, the existing unique index does not allow users to violate uniqueness
-    within the transaction. If you want to change existing unique index to deferrable,
-    you need execute `remove_index` before creating deferrable unique constraints.
+    If you want to change an existing unique index to deferrable, you can use :using_index
+    to create deferrable unique constraints.
+
+    ```ruby
+    add_unique_key :items, deferrable: :deferred, using_index: "index_items_on_position"
+    ```
 
     *Hiroyuki Ishii*
 

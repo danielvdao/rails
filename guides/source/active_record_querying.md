@@ -475,6 +475,16 @@ appropriate `:start` and `:finish` options on each worker.
 Overrides the application config to specify if an error should be raised when an
 order is present in the relation.
 
+**`:order`**
+
+Specifies the primary key order (can be `:asc` or `:desc`). Defaults to `:asc`.
+
+```ruby
+Customer.find_each(order: :desc) do |customer|
+  NewsMailer.weekly(customer).deliver_now
+end
+```
+
 #### `find_in_batches`
 
 The [`find_in_batches`][] method is similar to `find_each`, since both retrieve batches of records. The difference is that `find_in_batches` yields _batches_ to the block as an array of models, instead of individually. The following example will yield to the supplied block an array of up to 1000 customers at a time, with the final block containing any remaining customers:
@@ -1483,7 +1493,7 @@ Eager Loading Associations
 
 Eager loading is the mechanism for loading the associated records of the objects returned by `Model.find` using as few queries as possible.
 
-**N + 1 queries problem**
+### N + 1 Queries Problem
 
 Consider the following code, which finds 10 books and prints their authors' last_name:
 
@@ -1497,7 +1507,7 @@ end
 
 This code looks fine at the first sight. But the problem lies within the total number of queries executed. The above code executes 1 (to find 10 books) + 10 (one per each book to load the author) = **11** queries in total.
 
-**Solution to N + 1 queries problem**
+#### Solution to N + 1 Queries Problem
 
 Active Record lets you specify in advance all the associations that are going to be loaded.
 

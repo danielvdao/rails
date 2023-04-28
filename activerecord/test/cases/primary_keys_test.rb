@@ -53,6 +53,24 @@ class PrimaryKeysTest < ActiveRecord::TestCase
     assert_equal [1], topic.to_key
   end
 
+  def test_id_was
+    topic = Topic.find(1)
+    assert_equal 1, topic.id
+
+    topic.id = 3
+
+    assert_equal 1, topic.id_was
+    assert_equal 3, topic.id
+  end
+
+  def test_id?
+    topic = Topic.find(1)
+
+    assert_changes("topic.id?", from: true, to: false) do
+      topic.id = nil
+    end
+  end
+
   def test_integer_key
     topic = Topic.find(1)
     assert_equal(topics(:first).author_name, topic.author_name)
@@ -342,7 +360,7 @@ class PrimaryKeyAnyTypeTest < ActiveRecord::TestCase
     assert_no_match %r{t\.index \["code"\]}, schema
   end
 
-  if current_adapter?(:Mysql2Adapter) && supports_datetime_with_precision?
+  if current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && supports_datetime_with_precision?
     test "schema typed primary key column" do
       @connection.create_table(:scheduled_logs, id: :timestamp, precision: 6, force: true)
       schema = dump_table_schema("scheduled_logs")
@@ -410,6 +428,38 @@ class CompositePrimaryKeyTest < ActiveRecord::TestCase
 
     assert_raises(TypeError) do
       book.id = 1
+    end
+  end
+
+  def test_id_was_composite
+    book = cpk_books(:cpk_great_author_first_book)
+    book_id = book.id
+
+    assert_not_equal [42, 42], book_id
+
+    book.id = [42, 42]
+
+    assert_equal book_id, book.id_was
+    assert_equal [42, 42], book.id
+  end
+
+  def test_id_predicate_composite
+    book = cpk_books(:cpk_great_author_first_book)
+
+    valid_id = [42, 42]
+
+    invalid_ids = [
+      [42, nil],
+      [nil, 42],
+      [nil, nil],
+    ]
+
+    invalid_ids.each do |invalid_id|
+      book.id = valid_id
+
+      assert_changes("book.id?", from: true, to: false) do
+        book.id = invalid_id
+      end
     end
   end
 
@@ -483,7 +533,7 @@ class PrimaryKeyIntegerNilDefaultTest < ActiveRecord::TestCase
 end
 
 class PrimaryKeyIntegerTest < ActiveRecord::TestCase
-  if current_adapter?(:PostgreSQLAdapter, :Mysql2Adapter)
+  if current_adapter?(:PostgreSQLAdapter, :Mysql2Adapter, :TrilogyAdapter)
     include SchemaDumpingHelper
 
     self.use_transactional_tests = false
@@ -519,7 +569,7 @@ class PrimaryKeyIntegerTest < ActiveRecord::TestCase
       assert_match %r{create_table "widgets", id: :#{@pk_type}, }, schema
     end
 
-    if current_adapter?(:Mysql2Adapter)
+    if current_adapter?(:Mysql2Adapter, :TrilogyAdapter)
       test "primary key column type with options" do
         @connection.create_table(:widgets, id: :primary_key, limit: 4, unsigned: true, force: true)
         column = @connection.columns(:widgets).find { |c| c.name == "id" }

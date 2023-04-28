@@ -337,6 +337,8 @@ module ActiveRecord
       end
     end
 
+    # = Active Record Connection Adapters \Table \Definition
+    #
     # Represents the schema of an SQL table in an abstract way. This class
     # provides methods for manipulating the schema representation.
     #
@@ -485,14 +487,7 @@ module ActiveRecord
         name = name.to_s
         type = type.to_sym if type
 
-        if @columns_hash[name]
-          if @columns_hash[name].primary_key?
-            raise ArgumentError, "you can't redefine the primary key column '#{name}' on '#{@name}'. To define a custom primary key, pass { id: false } to create_table."
-          else
-            raise ArgumentError, "you can't define an already defined column '#{name}' on '#{@name}'."
-          end
-        end
-
+        raise_on_duplicate_column(name)
         @columns_hash[name] = new_column_definition(name, type, **options)
 
         if index
@@ -608,6 +603,16 @@ module ActiveRecord
         def integer_like_primary_key_type(type, options)
           type
         end
+
+        def raise_on_duplicate_column(name)
+          if @columns_hash[name]
+            if @columns_hash[name].primary_key?
+              raise ArgumentError, "you can't redefine the primary key column '#{name}' on '#{@name}'. To define a custom primary key, pass { id: false } to create_table."
+            else
+              raise ArgumentError, "you can't define an already defined column '#{name}' on '#{@name}'."
+            end
+          end
+        end
     end
 
     class AlterTable # :nodoc:
@@ -649,6 +654,8 @@ module ActiveRecord
       end
     end
 
+    # = Active Record Connection Adapters \Table
+    #
     # Represents an SQL table in an abstract way for updating a table.
     # Also see TableDefinition and {connection.create_table}[rdoc-ref:SchemaStatements#create_table]
     #
