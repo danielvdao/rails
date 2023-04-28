@@ -47,13 +47,16 @@ module ActiveSupport
         exabytes(number) * 1024
       end
 
-      def test_number_to_currency_truncate_whole
+      def test_number_to_currency_convert_to_whole_number
         [@instance_with_helpers, TestClassWithClassNumberHelpers, ActiveSupport::NumberHelper].each do |number_helper|
-          assert_equal("$1,234,567,892.50", number_helper.number_to_currency(1234567892.50, truncate_whole_number: true))
-          assert_equal("$1,234,567,891", number_helper.number_to_currency(1234567891.00, truncate_whole_number: true))
-          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.05, truncate_whole_number: true))
-          assert_equal("&pound;1234567890,50", number_helper.number_to_currency(1234567890.50, unit: "&pound;", separator: ",", delimiter: "", truncate_whole_number: true))
-          assert_equal("&pound;1234567890", number_helper.number_to_currency(1234567890.00, unit: "&pound;", separator: ",", delimiter: "", truncate_whole_number: true))
+          assert_equal("$1,234,567,892.50", number_helper.number_to_currency(1234567892.50, convert_to_whole_number: true))
+          assert_equal("$1,234,567,891", number_helper.number_to_currency(1234567891.00, convert_to_whole_number: true))
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.05, convert_to_whole_number: true))
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050, convert_to_whole_number: true, strip_insignificant_zeros: true))
+          assert_equal("$1,234,567,892", number_helper.number_to_currency(1234567892.00, convert_to_whole_number: true, strip_insignificant_zeros: true))
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050000, convert_to_whole_number: true, strip_insignificant_zeros: true))
+          assert_equal("&pound;1234567890,50", number_helper.number_to_currency(1234567890.50, unit: "&pound;", separator: ",", delimiter: "", convert_to_whole_number: true))
+          assert_equal("&pound;1234567890", number_helper.number_to_currency(1234567890.00, unit: "&pound;", separator: ",", delimiter: "", convert_to_whole_number: true))
         end
       end
 
