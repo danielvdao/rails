@@ -94,6 +94,16 @@ module ActiveSupport
           assert_equal("-$,11", number_helper.number_to_currency("-,11"))
           assert_equal("$0.00", number_helper.number_to_currency(-0.0))
           assert_equal("$0.00", number_helper.number_to_currency("-0.0"))
+          assert_equal("$1,234,567,892.50", number_helper.number_to_currency(1234567892.50, strip_final_zeros: true))
+          assert_equal("$1,234,567,891", number_helper.number_to_currency(1234567891.00, strip_final_zeros: true))
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.05, strip_final_zeros: true))
+          assert_equal("&pound;1234567890,50", number_helper.number_to_currency(1234567890.50, unit: "&pound;", separator: ",", delimiter: "", strip_final_zeros: true))
+          assert_equal("&pound;1234567890", number_helper.number_to_currency(1234567890.00, unit: "&pound;", separator: ",", delimiter: "", strip_final_zeros: true))
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050, strip_final_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("$1,234,567,892", number_helper.number_to_currency(1234567892.00, strip_final_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("$1,234,567,892.05", number_helper.number_to_currency(1234567892.050000, strip_final_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("&pound;1234567890,5", number_helper.number_to_currency(1234567890.50, unit: "&pound;", separator: ",", delimiter: "", strip_final_zeros: true, strip_insignificant_zeros: true))
+          assert_equal("&pound;1234567890", number_helper.number_to_currency(1234567890.00, unit: "&pound;", separator: ",", delimiter: "", strip_final_zeros: true, strip_insignificant_zeros: true))
         end
       end
 
